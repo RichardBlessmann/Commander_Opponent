@@ -5,23 +5,25 @@ from utils import load_deck
 from tkinter import Tk, filedialog
 
 
-def choose_deck_file():
+def choose_deck_file(name="x"):
     Tk().withdraw()
-    return filedialog.askopenfilename(title="Choose a deck file", filetypes=[("Text files", "*.txt")])
+    return filedialog.askopenfilename(
+        title=f"Choose a deck file for {name}",
+        filetypes=[("Text files", "*.txt")]
+    )
 
 def main():
     # Example 1: load from file
-    deck1_path = choose_deck_file()
-    deck1 = load_deck(deck1_path, card_db)
+    print(f"Search for Alice")
+    deck1_path = choose_deck_file("Alice")
+    deck1, commander1 = load_deck(deck1_path)
 
-    # Example 2: load directly from list
-    deck2, commander2 = load_deck(
-        ["Commander", "1x Atraxa, Praetors' Voice",
-         "Mainboard", "2x Forest", "1x Llanowar Elves", "1x Grizzly Bears"]
-    )
+    print(f"Search for Bob")
+    deck2_path = choose_deck_file("Bob")
+    deck2, commander2 = load_deck(deck2_path)
 
-    p1 = Player("Alice", deck1)
-    p2 = Player("Bob", deck2)
+    p1 = Player("Alice", deck1, commander1)
+    p2 = Player("Bob", deck2, commander2)
 
     game = GameEngine([p1, p2])
     game.start_game()

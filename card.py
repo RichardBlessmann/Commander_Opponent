@@ -1,11 +1,14 @@
 class Card:
-    def __init__(self, name, type_line, mana_cost, text, power=None, toughness=None):
+    def __init__(self, name, type_line, mana_cost, text, power=None, toughness=None, image_url=None):
         self.name = name
         self.type_line = type_line
         self.mana_cost = mana_cost
         self.text = text
         self.power = power
         self.toughness = toughness
+        self.tapped = False
+        self.summoning_sickness = True
+        self.image_url = image_url
 
     def is_land(self):
         return "Land" in self.type_line

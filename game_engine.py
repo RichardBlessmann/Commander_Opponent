@@ -4,25 +4,109 @@ class GameEngine:
         self.turn = 0
 
     def start_game(self):
-        for p in self.players:
-            p.draw_card(7)
-            print(f"{p.name} starts with {len(p.hand)} cards.")
+        for player in self.players:
+            # draw opening 7
+            for _ in range(7):
+                player.draw_card()
 
         while all(p.life_total > 0 for p in self.players):
-            self.play_turn(self.players[self.turn % len(self.players)])
-            self.turn += 1
-            if self.turn > 20:  # safety stop for now
-                break
+            self.next_turn()
 
-    def play_turn(self, player):
-        print(f"\n=== Turn {self.turn + 1}: {player.name}'s turn ===")
-        player.new_turn()
-        player.draw_card()
-        player.play_land()
-        player.cast_creature()
+    def next_turn(self):
+        player = self.players[self.turn % len(self.players)]
+        print(f"\n=== {player.name}'s turn ===")
 
+        self.untap_step(player)
+        self.upkeep_step(player)
+        self.draw_step(player)
+        self.main_phase(player)
+        self.combat_phase(player)
+        self.second_main_phase(player)
+        self.end_step(player)
         self.show_table_state()
 
+        self.turn += 1
+
+    def untap_step(self, player):
+        player.untap_all()
+        print(f"{player.name} untaps permanents.")
+
+    def upkeep_step(self, player):
+        print(f"{player.name}'s upkeep step.")
+
+    def draw_step(self, player):
+        player.draw_card()
+
+    def main_phase(self, player):
+        print(f"{player.name}'s main phase.")
+
+        if player.lands_played_this_turn == 0:
+            player.play_land()
+
+        # 2. Cast creatures until the player has no more creatures in hand
+        while player.cast_creature():
+            pass
+
+    def combat_phase(self, player):
+        print(f"{player.name}'s combat phase.")
+
+        target_player = self.players[(self.players.index(player) + 1) % len(self.players)]
+
+        attackers = player.declare_attackers()
+        if not attackers:
+            print(f"{player.name} has no attackers.")
+            return
+
+        print(f"{player.name} attacks with: {[c.name for c in attackers]}")
+
+
+        blockers = target_player.declare_blockers(attackers)
+        if blockers:
+            for attacker, blocker in blockers.items():
+                print(f"{target_player.name} blocks {attacker.name} with {blocker.name}")
+
+        for attacker in attackers:
+            if attacker in blockers:
+                blocker = blockers[attacker]
+                if attacker.power and blocker.toughness:
+                    blocker.toughness -= attacker.power
+                if blocker.power and attacker.toughness:
+                    attacker.toughness -= blocker.power
+            else:
+                target_player.life_total -= int(attacker.power) if attacker.power else 0
+
+        for p in [player, target_player]:
+            dead = [c for c in p.battlefield if c.is_creature() and (c.toughness is not None and int(c.toughness) <= 0)]
+            for c in dead:
+                p.battlefield.remove(c)
+                p.graveyard.append(c)
+                print(f"{c.name} dies and goes to graveyard {p.name}")
+
+    def second_main_phase(self, player):
+        print(f"{player.name}'s second main phase.")
+        if player.lands_played_this_turn == 0:
+            player.play_land()
+
+
+    def end_step(self, player):
+        print(f"{player.name}'s end step.")
+
+        # 1. Reset lands played this turn
+        player.lands_played_this_turn = 0
+
+        # 2. Remove summoning sickness for creatures that have been on battlefield since last turn
+        # (optional, if you track it per creature)
+        for card in player.battlefield:
+            if card.is_creature():
+                card.summoning_sickness = False  # you need to add this to Card class
+
+        # 3. Print end-of-turn state for debugging
+        print(f"End of {player.name}'s turn:")
+        print(f"  Life: {player.life_total}")
+        print(f"  Hand: {[c.name for c in player.hand]}")
+        print(f"  Battlefield: {[c.name for c in player.battlefield]}")
+        print(f"  Graveyard: {[c.name for c in player.graveyard]}")
+        print(f"  Command Zone: {[c.name for c in player.command_zone]}")
     def show_table_state(self):
         print("\nCurrent Game State:")
         for p in self.players:

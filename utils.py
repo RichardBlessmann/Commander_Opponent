@@ -3,14 +3,26 @@ import requests
 from card import Card
 
 def fetch_card_from_scryfall(card_name):
-    url = f"https://api.scryfall.com/cards/named"
+    url = "https://api.scryfall.com/cards/named"
     params = {"exact": card_name}
-    response = requests.get(url)
+    print(f"Fetching: {card_name}")  # debug
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+    except Exception as e:
+        print(f"Network error while fetching {card_name}: {e}")
+        return None
+
     if response.status_code != 200:
-        print(f"⚠️ Could not fetch {card_name} from Scryfall")
+        print(f"Failed to fetch {card_name} (status {response.status_code})")
+        try:
+            print("Scryfall says:", response.json())  # show API error
+        except:
+            print("Raw response:", response.text)
         return None
 
     data = response.json()
+    image_url_float = data.get("image_uris", {}).get("normal")
     return Card(
         name=data.get("name"),
         type_line=data.get("type_line"),
@@ -18,8 +30,26 @@ def fetch_card_from_scryfall(card_name):
         text=data.get("oracle_text", ""),
         power=data.get("power"),
         toughness=data.get("toughness"),
+        image_url=image_url_float,
     )
+def parse_deck_line(line: str):
+    line = line.strip()
+    if not line:
+        return None, None
 
+    if "x" in line and line[0].isdigit():
+        qty, card_name = line.split("x",1)
+        qty = qty.strip()
+        card_name = card_name.strip()
+    else:
+        qty, card_name = "1", line
+
+    try:
+        qty = int(qty)
+    except ValueError:
+        qty = 1
+
+    return qty, card_name
 def load_deck(source, local_db=None):
     deck = []
     commander = None
@@ -35,30 +65,28 @@ def load_deck(source, local_db=None):
         raise ValueError("Deck source must be a file path or a list of card names.")
 
     section = None
+
+    section_headers = (
+        "commander", "mainboard", "sideboard",
+        "anthem", "blink", "artifact", "enchantment", "sorcery",
+        "instant", "planeswalker", "creatures", "land",
+        "draw", "protection", "ramp", "removal", "recursion",
+        "tokens", "proliferate", "pump", "evasion"
+    )
+
     for line in lines:
         line = line.strip()
         if not line:
             continue
 
-        if line.lower().startswith("commander"):
-            section = "commander"
-            continue
-        elif line.lower().startswith("mainboard"):
-            section = "mainboard"
-            continue
-        elif line.lower().startswith("sideboard"):
-            section = "sideboard"
+        if line.lower() in section_headers:
+            section = line.lower()
             continue
 
-        if "x" in line:
-            parts = line.split("x")
-            qty, card_name = parts[0].strip(), parts[1].strip()
-        else:
-            qty, card_name = "1", line
+        qty, card_name = parse_deck_line(line)
+        if not card_name:
+            continue
 
-        qty = int(qty) if qty.isdigit() else 1
-
-        # try local db first
         card_obj = None
         if local_db and card_name in local_db:
             card_obj = local_db[card_name]
