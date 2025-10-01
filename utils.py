@@ -1,6 +1,27 @@
 import os
 import requests
 from card import Card
+import re
+
+
+def parse_mana_cost(mana_cost):
+    """
+    Convert mana cost string like '2GGU' into a dict:
+    {'C': 2, 'G': 2, 'U': 1}
+    """
+    cost = {"W": 0, "U": 0, "B": 0, "R": 0, "G": 0, "C": 0}
+
+    # Match groups like "2", "G", "U", etc.
+    tokens = re.findall(r"\d+|[WUBRGC]", mana_cost)
+
+    for token in tokens:
+        if token.isdigit():
+            cost["C"] += int(token)  # generic mana
+        else:
+            cost[token] += 1
+
+    return cost
+
 
 def fetch_card_from_scryfall(card_name):
     url = "https://api.scryfall.com/cards/named"
